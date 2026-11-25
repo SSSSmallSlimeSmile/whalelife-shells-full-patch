@@ -75,3 +75,21 @@ ask  记录：回 needs_confirmation / 零调用（会话是 full 也不放行�
 
 - 上游：`iinukami/whalelife`（AGPL-3.0-only），插件 `thinking-space` 与之同许可
 - 本补丁是对本地副本的修改，署名与许可不变；不是官方版本，原作者不背书
+
+## 重新生成 patch（用 node，不要用 PowerShell 重定向）
+
+`git diff` 的输出落到文件时，如果经过 PowerShell 的 `>`、`Out-File`、`Select-String` 之类，字节会被按 GBK 解一遍再写出去，中文全成乱码，U+FFFD 满屏——这就是 hands README 坑 13 那条。patch 里一处中文坏掉，`git apply` 会在那一行静默失败。
+
+生成时抓 stdout 的原始 buffer 直接写盘：
+
+```js
+import { spawnSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+const r = spawnSync("git", ["diff", "faae628", "--", "sub/shells/index.ts"], {
+  cwd: "K:\\Github\\thinking-space-test", maxBuffer: 64 << 20,
+});
+if (r.status !== 0) throw new Error(r.stderr.toString());
+writeFileSync("shells-full.patch", r.stdout);   // 原样字节，不转字符串
+```
+
+写完回读三样：字节数、U+FFFD 个数（应为 0）、裸换行（应全是 LF）。这份现在是 9165 字节、U+FFFD 0、纯 LF。
